@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:14.3
+    platform: linux/amd64
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file: ./backend/.env 
+    container_name: bodega_sena_db
+    volumes:
+      - innovasoft:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../INNOVASOFTNEST
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    restart: always
+    env_file: ./backend/.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npm run migration:run && npm run start:prod"
+    # Se ha eliminado la sección 'volumes' para asegurar que se use el código de la imagen
+
+  frontend:
+    build:
+      context: ../BODEGASENA
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    restart: always
+    env_file: ./front/.env
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+    nginx:
+     image: nginx:latest
+     container_name: bodega_sena_nginx
+     ports:
+      - "80:80"
+     volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+     depends_on:
+      - frontend
+      - backend
+
+volumes:
+  innovasoft:
+    driver: local
